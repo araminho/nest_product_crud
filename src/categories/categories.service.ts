@@ -36,15 +36,13 @@ export class CategoriesService {
   }
 
   async remove(id: number) {
-    // Load category with its products
     const category = await this.categoryRepo.findOne({
       where: { id },
-      relations: ['products'], // important
+      relations: ['products'],
     });
 
     if (!category) throw new NotFoundException('Category not found');
 
-    // Prevent deletion if products exist
     if (category.products.length > 0) {
       throw new BadRequestException(
         'Cannot delete category because it has products',
@@ -52,6 +50,8 @@ export class CategoriesService {
     }
 
     await this.categoryRepo.delete(id);
+
+    return { message: `Category "${category.title}" successfully deleted` };
   }
 
 }
