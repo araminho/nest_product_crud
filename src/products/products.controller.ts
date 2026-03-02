@@ -1,39 +1,53 @@
-import { Controller, Get, Post, Patch, Body, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller, Query, Get, Post, Patch, Body, Param, Delete,
+  ParseIntPipe, UseGuards, UseInterceptors, ClassSerializerInterceptor
+} from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Product } from './product.entity';
-import { UseGuards } from '@nestjs/common';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { ProductResponseDto } from './dto/product-response.dto';
+import { PaginatedProductsResponseDto } from './dto/paginated-products-response.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('products')
+// This interceptor will automatically respect @Exclude/@Expose in the DTOs
+@UseInterceptors(ClassSerializerInterceptor)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() dto: CreateProductDto): Promise<Product> {
-    console.log('Creating product with data:', dto);
-    return this.productsService.create(dto);
+  async create(@Body() dto: CreateProductDto): Promise<ProductResponseDto> {
+    const product = await this.productsService.create(dto);
+    return plainToInstance(ProductResponseDto, product, { excludeExtraneousValues: true });
   }
 
   @Get()
-  findAll(): Promise<Product[]> {
-    return this.productsService.findAll();
+  async findAll(@Query() dto: PaginationDto): Promise<PaginatedProductsResponseDto> {
+    const result = await this.productsService.findAll(dto);
+    return plainToInstance(PaginatedProductsResponseDto, result, { excludeExtraneousValues: true });
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Product> {
-    return this.productsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ProductResponseDto> {
+    const product = await this.productsService.findOne(id);
+    return plainToInstance(ProductResponseDto, product, { excludeExtraneousValues: true });
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductDto,
-  ): Promise<Product> {
-    return this.productsService.update(id, dto);
+  ): Promise<ProductResponseDto> {
+    const product = await this.productsService.update(id, dto);
+
+    // Convert the Entity back to the DTO for the response
+    return plainToInstance(ProductResponseDto, product, {
+      excludeExtraneousValues: true
+    });
   }
 
   @UseGuards(JwtAuthGuard)

@@ -5,6 +5,7 @@ import { Product } from './product.entity';
 import { Category } from '../categories/category.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class ProductsService {
@@ -30,8 +31,27 @@ export class ProductsService {
     return this.productRepo.save(product);
   }
 
-  findAll(): Promise<Product[]> {
-    return this.productRepo.find();
+  async findAll(dto: PaginationDto): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    lastPage: number;
+  }> {
+    const { page, limit } = dto;
+
+    const [data, total] = await this.productRepo.findAndCount({
+      relations: ['category'],
+      order: { id: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number): Promise<Product> {
@@ -41,19 +61,28 @@ export class ProductsService {
   }
 
   async update(id: number, dto: UpdateProductDto): Promise<Product> {
-    const product = await this.productRepo.findOneBy({ id });
-    if (!product) throw new NotFoundException('Product not found');
+    const { categoryId, ...updateData } = dto;
 
-    if (dto.categoryId) {
-      const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
-      if (!category) throw new NotFoundException('Category not found');
+    // 1. Preload the product with the basic fields (name, price, etc.)
+    const product = await this.productRepo.preload({
+      id,
+      ...updateData,
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product not found`);
+    }
+
+    // 2. Handle the category relation safety check
+    if (categoryId) {
+      const category = await this.categoryRepo.findOneBy({ id: categoryId });
+      if (!category) {
+        throw new NotFoundException(`Category not found`);
+      }
       product.category = category;
     }
 
-    if (dto.name !== undefined) product.name = dto.name;
-    if (dto.price !== undefined) product.price = dto.price;
-    if (dto.description !== undefined) product.description = dto.description;
-
+    // 3. Save the merged entity (only updates changed columns)
     return this.productRepo.save(product);
   }
 

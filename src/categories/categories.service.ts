@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -16,8 +17,26 @@ export class CategoriesService {
     return this.categoryRepo.save(category);
   }
 
-  async findAll(): Promise<Category[]> {
-    return this.categoryRepo.find();
+  async findAll(dto: PaginationDto): Promise<{
+    data: Category[];
+    total: number;
+    page: number;
+    lastPage: number;
+  }> {
+    const { page, limit } = dto;
+
+    const [data, total] = await this.categoryRepo.findAndCount({
+      order: { id: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number): Promise<Category> {
@@ -27,11 +46,18 @@ export class CategoriesService {
   }
 
   async update(id: number, dto: UpdateCategoryDto): Promise<Category> {
-    const category = await this.categoryRepo.findOneBy({ id });
-    if (!category) throw new NotFoundException('Category not found');
+    // 1. Preload tries to find the entity by ID and maps the DTO onto it
+    const category = await this.categoryRepo.preload({
+      id,
+      ...dto,
+    });
 
-    if (dto.title !== undefined) category.title = dto.title;
+    // 2. If preload returns undefined, the ID doesn't exist in the DB
+    if (!category) {
+      throw new NotFoundException(`Category not found`);
+    }
 
+    // 3. Save the merged entity
     return this.categoryRepo.save(category);
   }
 
