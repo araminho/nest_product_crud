@@ -17,4 +17,7 @@ export class ProductResponseDto {
   @Expose()
   @Type(() => CategoryResponseDto)
   category: CategoryResponseDto;
+
+  @Expose()
+  image: string;
 }

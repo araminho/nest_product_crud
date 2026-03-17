@@ -9,14 +9,17 @@ export class Product {
   @Column()
   name: string;
 
-  @Column('decimal')
-  price: number;
+  @Column('decimal', { precision: 10, scale: 2 })
+  price!: number;
 
   @Column({ nullable: true })
   description?: string;
 
   @ManyToOne(() => Category, category => category.products, { eager: true })
   category: Category;
+
+  @Column({ nullable: true })
+  image?: string;
 
   @CreateDateColumn()
   createdAt!: Date;
